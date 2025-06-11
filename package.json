@@ -1,17 +1,29 @@
 {
   "name": "opc-ua-service",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "HCR Robot OPC UA Service with Security",
+  "main": "src/server/server.js",
   "scripts": {
+    "start": "node src/server/server.js",
+    "start:secure": "node src/server/security-server.js",
+    "client": "node src/client/client.js",
+    "client:secure": "node src/client/security-client.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "opc-ua",
+    "robot",
+    "automation",
+    "security",
+    "industrial"
+  ],
+  "author": "HCR",
   "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
-    "node-opcua": "^2.156.0",
-    "node-opcua-nodesets": "^2.155.0"
+    "node-opcua": "^2.119.0"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=14.0.0"
   }
 }
