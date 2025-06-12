@@ -1,3 +1,11 @@
+// Part 1: Concepts - 애플리케이션 생명주기 및 오류 처리
+// Part 2: Security Model - 보안 정책, 인증서 관리, 사용자 인증
+// Part 3: Address Space Model - 주소 공간 구성
+// Part 4: Services - 서버 서비스 구현 및 초기화
+// Part 5: Information Model - 표준 노드셋 및 디바이스 정보 모델
+// Part 6: Mappings - TCP/IP 네트워크 바인딩
+// Part 7: Profiles - 보안 프로파일 준수
+// Part 12: Discovery - 엔드포인트 URL 제공
 const { 
     OPCUAServer, 
     nodesets,

@@ -1,3 +1,11 @@
+// OPC UA Part 1: Concepts - 애플리케이션 생명주기 및 오류 처리
+// OPC UA Part 2: Security Model - 보안 정책, 인증서 관리, 사용자 인증
+// OPC UA Part 3: Address Space Model - 노드 탐색 및 주소 공간 접근
+// OPC UA Part 4: Services - 클라이언트 서비스 구현 및 보안 세션
+// OPC UA Part 5: Information Model - 메서드 호출 및 데이터 타입
+// OPC UA Part 6: Mappings - TCP/IP 보안 매핑
+// OPC UA Part 7: Profiles - 보안 프로파일 준수
+// OPC UA Part 12: Discovery - 보안 엔드포인트 디스커버리
 const { 
     OPCUAClient, 
     MessageSecurityMode, 
@@ -18,33 +26,26 @@ const path = require('path');
 class SecureRobotOPCUAClient {
     constructor(options = {}) {
         this.options = {
-            // 기본 보안 설정
-            securityPolicy: options.securityPolicy || SecurityPolicy.Basic256Sha256,
-            securityMode: options.securityMode || MessageSecurityMode.SignAndEncrypt,
+            securityPolicy: options.securityPolicy || SecurityPolicy.Basic256Sha256, // OPC UA Part 2: Security Model - 보안 정책 설정
+            securityMode: options.securityMode || MessageSecurityMode.SignAndEncrypt, // OPC UA Part 2: Security Model - 메시지 보안 모드
             
-            // 사용자 인증
-            username: options.username || null,
+            username: options.username || null, // OPC UA Part 2: Security Model - 사용자 인증
             password: options.password || null,
             
-            // 인증서 설정
-            certificateFile: options.certificateFile || null,
+            certificateFile: options.certificateFile || null, // OPC UA Part 2: Security Model - 클라이언트 인증서
             privateKeyFile: options.privateKeyFile || null,
             
-            // 연결 설정
-            endpointUrl: options.endpointUrl || 'opc.tcp://localhost:4843/UA/RobotArm',
-            applicationName: options.applicationName || 'SecureRobotClient',
+            endpointUrl: options.endpointUrl || 'opc.tcp://localhost:4843/UA/RobotArm', // OPC UA Part 12: Discovery - 보안 엔드포인트
+            applicationName: options.applicationName || 'SecureRobotClient', // OPC UA Part 5: Information Model - 애플리케이션 정보
             applicationUri: options.applicationUri || 'urn:secure-robot-client',
             
-            // 테스트 모드
             testMode: options.testMode || 'full',  // 'basic', 'security', 'full'
-            
-            // 디버그 모드
             debug: options.debug || false
         };
         
         this.client = null;
-        this.session = null;
-        this.nodeIds = {};
+        this.session = null; // OPC UA Part 4: Services - 보안 세션 관리
+        this.nodeIds = {}; // OPC UA Part 3: Address Space Model - 노드 ID 캐시
         
         this.log("🔐 보안 클라이언트 초기화 완료");
         this.log(`📋 보안 정책: ${this.options.securityPolicy}`);
@@ -66,25 +67,23 @@ class SecureRobotOPCUAClient {
     async initialize() {
         this.log("클라이언트 초기화 중...");
         
-        const clientOptions = {
-            securityMode: this.options.securityMode,
-            securityPolicy: this.options.securityPolicy,
-            applicationName: this.options.applicationName,
-            applicationUri: this.options.applicationUri,
-            endpointMustExist: false,
-            keepSessionAlive: true,
+        const clientOptions = { // OPC UA Part 4: Services - 클라이언트 구성 서비스
+            securityMode: this.options.securityMode, // OPC UA Part 2: Security Model - 보안 모드
+            securityPolicy: this.options.securityPolicy, // OPC UA Part 2: Security Model - 보안 정책
+            applicationName: this.options.applicationName, // OPC UA Part 5: Information Model - 애플리케이션 이름
+            applicationUri: this.options.applicationUri, // OPC UA Part 5: Information Model - 애플리케이션 URI
+            endpointMustExist: false, // OPC UA Part 12: Discovery - 엔드포인트 검증
+            keepSessionAlive: true, // OPC UA Part 4: Services - 세션 유지
             requestedSessionTimeout: 60000,
         };
 
-        // 인증서 설정 (보안 정책이 None이 아닌 경우)
-        if (this.options.securityPolicy !== SecurityPolicy.None) {
+        if (this.options.securityPolicy !== SecurityPolicy.None) { // OPC UA Part 2: Security Model - 보안 정책 조건부 처리
             await this.setupClientCertificates(clientOptions);
         }
 
-        this.client = OPCUAClient.create(clientOptions);
+        this.client = OPCUAClient.create(clientOptions); // OPC UA Part 4: Services - 클라이언트 생성
         
-        // 클라이언트 이벤트 핸들러 등록
-        this.setupEventHandlers();
+        this.setupEventHandlers(); // OPC UA Part 1: Concepts - 이벤트 처리
         
         this.log("✅ 클라이언트 초기화 완료");
     }
@@ -92,34 +91,30 @@ class SecureRobotOPCUAClient {
     /**
      * 클라이언트 인증서 설정
      */
-    async setupClientCertificates(clientOptions) {
+    async setupClientCertificates(clientOptions) { // OPC UA Part 2: Security Model - 인증서 관리
         this.log("클라이언트 인증서 설정 중...");
         
         const certDir = path.join(__dirname, '../../certificates/client');
         const certFile = path.join(certDir, 'client_cert.pem');
         const keyFile = path.join(certDir, 'client_key.pem');
         
-        // 클라이언트 인증서 폴더 생성
-        if (!fs.existsSync(certDir)) {
+        if (!fs.existsSync(certDir)) { // OPC UA Part 2: Security Model - 인증서 저장소 관리
             fs.mkdirSync(certDir, { recursive: true });
             this.log("📁 클라이언트 인증서 폴더 생성");
         }
 
-        // 사용자 지정 인증서 파일이 있으면 사용
         if (this.options.certificateFile && this.options.privateKeyFile) {
             if (fs.existsSync(this.options.certificateFile) && fs.existsSync(this.options.privateKeyFile)) {
-                clientOptions.certificateFile = this.options.certificateFile;
+                clientOptions.certificateFile = this.options.certificateFile; // OPC UA Part 2: Security Model - 사용자 정의 인증서
                 clientOptions.privateKeyFile = this.options.privateKeyFile;
                 this.log("📜 사용자 지정 인증서 사용");
                 return;
             }
         }
 
-        // 기본 클라이언트 인증서가 없으면 자동 생성 모드 사용
         if (!fs.existsSync(certFile) || !fs.existsSync(keyFile)) {
             this.log("⚙️ 자동 인증서 생성 모드 활성화");
-            // 자동 생성 모드 - node-opcua가 기본 인증서를 사용하도록 설정
-            clientOptions.automaticallyAcceptUnknownCertificate = true;
+            clientOptions.automaticallyAcceptUnknownCertificate = true; // OPC UA Part 2: Security Model - 자동 인증서 수락
         } else {
             clientOptions.certificateFile = certFile;
             clientOptions.privateKeyFile = keyFile;
@@ -130,10 +125,10 @@ class SecureRobotOPCUAClient {
     /**
      * 이벤트 핸들러 설정
      */
-    setupEventHandlers() {
+    setupEventHandlers() { // OPC UA Part 1: Concepts - 이벤트 기반 아키텍처
         if (!this.client) return;
 
-        this.client.on("connectionLost", () => {
+        this.client.on("connectionLost", () => { // OPC UA Part 6: Mappings - 연결 상태 모니터링
             this.log("🔌 서버 연결 끊어짐", true);
         });
 
@@ -141,7 +136,7 @@ class SecureRobotOPCUAClient {
             this.log("🔌 서버 연결 재설정");
         });
 
-        this.client.on("securityTokenRenewed", () => {
+        this.client.on("securityTokenRenewed", () => { // OPC UA Part 2: Security Model - 보안 토큰 갱신
             this.log("🔑 보안 토큰 갱신됨");
         });
     }
@@ -157,11 +152,10 @@ class SecureRobotOPCUAClient {
         this.log(`🔗 서버 연결 시도: ${this.options.endpointUrl}`);
         
         try {
-            await this.client.connect(this.options.endpointUrl);
+            await this.client.connect(this.options.endpointUrl); // OPC UA Part 6: Mappings - TCP 보안 연결
             this.log("✅ 서버 연결 성공");
             
-            // 엔드포인트 정보 확인
-            await this.checkEndpoints();
+            await this.checkEndpoints(); // OPC UA Part 12: Discovery - 엔드포인트 정보 확인
             
         } catch (error) {
             this.log(`서버 연결 실패: ${error.message}`, true);
@@ -172,18 +166,18 @@ class SecureRobotOPCUAClient {
     /**
      * 사용 가능한 엔드포인트 확인
      */
-    async checkEndpoints() {
+    async checkEndpoints() { // OPC UA Part 12: Discovery - 엔드포인트 디스커버리
         this.log("🔍 사용 가능한 엔드포인트 확인 중...");
         
         try {
-            const endpoints = await this.client.getEndpoints();
+            const endpoints = await this.client.getEndpoints(); // OPC UA Part 12: Discovery - GetEndpoints 서비스
             
             this.log(`📊 총 ${endpoints.length}개의 엔드포인트 발견:`);
             
             endpoints.forEach((endpoint, index) => {
-                const secPolicy = endpoint.securityPolicyUri.split('#')[1] || 'None';
-                const secMode = endpoint.securityMode.toString();
-                const userTokens = endpoint.userIdentityTokens.map(token => 
+                const secPolicy = endpoint.securityPolicyUri.split('#')[1] || 'None'; // OPC UA Part 2: Security Model - 보안 정책 URI
+                const secMode = endpoint.securityMode.toString(); // OPC UA Part 2: Security Model - 보안 모드
+                const userTokens = endpoint.userIdentityTokens.map(token => // OPC UA Part 2: Security Model - 사용자 토큰 정책
                     UserTokenType[token.tokenType] || token.tokenType
                 ).join(', ');
                 
@@ -198,7 +192,7 @@ class SecureRobotOPCUAClient {
     /**
      * 세션 생성 (사용자 인증 포함)
      */
-    async createSession() {
+    async createSession() { // OPC UA Part 4: Services - CreateSession 서비스
         if (!this.client) {
             throw new Error("클라이언트가 연결되지 않았습니다.");
         }
@@ -206,11 +200,10 @@ class SecureRobotOPCUAClient {
         this.log("🔐 보안 세션 생성 중...");
         
         const sessionOptions = {
-            requestedSessionTimeout: 60000,
+            requestedSessionTimeout: 60000, // OPC UA Part 4: Services - 세션 타임아웃
         };
 
-        // 사용자 인증 설정
-        if (this.options.username && this.options.password) {
+        if (this.options.username && this.options.password) { // OPC UA Part 2: Security Model - 사용자 이름/비밀번호 인증
             sessionOptions.userName = this.options.username;
             sessionOptions.password = this.options.password;
             this.log(`👤 사용자 인증: ${this.options.username}`);
@@ -219,11 +212,10 @@ class SecureRobotOPCUAClient {
         }
 
         try {
-            this.session = await this.client.createSession(sessionOptions);
+            this.session = await this.client.createSession(sessionOptions); // OPC UA Part 4: Services - 세션 생성
             this.log("✅ 보안 세션 생성 성공");
             
-            // 세션 정보 출력
-            this.log(`📋 세션 ID: ${this.session.sessionId}`);
+            this.log(`📋 세션 ID: ${this.session.sessionId}`); // OPC UA Part 4: Services - 세션 식별자
             this.log(`⏰ 세션 타임아웃: ${this.session.timeout}ms`);
             
         } catch (error) {
@@ -235,7 +227,7 @@ class SecureRobotOPCUAClient {
     /**
      * 서버의 노드들을 탐색하여 NodeId 수집
      */
-    async discoverNodes() {
+    async discoverNodes() { // OPC UA Part 3: Address Space Model - 주소 공간 탐색
         if (!this.session) {
             throw new Error("세션이 생성되지 않았습니다.");
         }
@@ -243,8 +235,7 @@ class SecureRobotOPCUAClient {
         this.log("🔍 노드 탐색 중...");
         
         try {
-            // Objects 폴더에서 Robot 객체 찾기
-            const browseResult = await this.session.browse("i=85");
+            const browseResult = await this.session.browse("i=85"); // OPC UA Part 4: Services - Browse 서비스
             let robotNodeId = null;
             
             for (const ref of browseResult.references) {
@@ -261,8 +252,7 @@ class SecureRobotOPCUAClient {
             this.nodeIds.robot = robotNodeId.toString();
             this.log(`🤖 Robot 객체 발견: ${this.nodeIds.robot}`);
 
-            // Robot 객체의 하위 노드들 탐색
-            const robotBrowseResult = await this.session.browse(robotNodeId);
+            const robotBrowseResult = await this.session.browse(robotNodeId); // OPC UA Part 3: Address Space Model - 계층적 브라우징
             
             const jointNames = ['Joint1', 'Joint2', 'Joint3', 'Joint4', 'Joint5', 'Joint6'];
             
@@ -270,7 +260,6 @@ class SecureRobotOPCUAClient {
                 const nodeName = ref.browseName.name;
                 
                 if (jointNames.includes(nodeName)) {
-                    // 관절 객체의 CurrentPosition 변수 찾기
                     const jointBrowseResult = await this.session.browse(ref.nodeId);
                     for (const jointRef of jointBrowseResult.references) {
                         if (jointRef.browseName.name === "CurrentPosition") {
@@ -307,22 +296,18 @@ class SecureRobotOPCUAClient {
         this.log(`🧪 테스트 모드: ${this.options.testMode}`);
         
         try {
-            // 노드 탐색
-            await this.discoverNodes();
+            await this.discoverNodes(); // OPC UA Part 3: Address Space Model - 노드 탐색
             
-            // 기본 테스트
             if (['basic', 'full'].includes(this.options.testMode)) {
-                await this.runBasicTests();
+                await this.runBasicTests(); // OPC UA Part 4: Services - 기본 서비스 테스트
             }
             
-            // 보안 테스트
             if (['security', 'full'].includes(this.options.testMode)) {
-                await this.runSecurityTests();
+                await this.runSecurityTests(); // OPC UA Part 2: Security Model - 보안 기능 테스트
             }
             
-            // 성능 테스트
             if (this.options.testMode === 'full') {
-                await this.runPerformanceTests();
+                await this.runPerformanceTests(); // OPC UA Part 1: Concepts - 성능 측정
             }
             
         } catch (error) {
@@ -337,19 +322,10 @@ class SecureRobotOPCUAClient {
     async runBasicTests() {
         this.log("\n📋 === 기본 기능 테스트 시작 ===");
         
-        // 1. 초기 상태 읽기
+        await this.readAllPositions(); // OPC UA Part 4: Services - Read 서비스
+        await this.testMovement(); // OPC UA Part 4: Services - Call 서비스
         await this.readAllPositions();
-        
-        // 2. 로봇 이동 테스트
-        await this.testMovement();
-        
-        // 3. 결과 확인
-        await this.readAllPositions();
-        
-        // 4. 홈 포지션으로 복귀
         await this.moveToHome();
-        
-        // 5. 최종 상태 확인
         await this.readAllPositions();
         
         this.log("✅ 기본 기능 테스트 완료");
@@ -358,17 +334,12 @@ class SecureRobotOPCUAClient {
     /**
      * 보안 기능 테스트
      */
-    async runSecurityTests() {
+    async runSecurityTests() { // OPC UA Part 2: Security Model - 보안 기능 검증
         this.log("\n🔒 === 보안 기능 테스트 시작 ===");
         
-        // 1. 세션 보안 정보 확인
-        await this.checkSessionSecurity();
-        
-        // 2. 권한 테스트 (사용자별 접근 제어)
-        await this.testPermissions();
-        
-        // 3. 보안 이벤트 로깅 테스트
-        await this.testSecurityLogging();
+        await this.checkSessionSecurity(); // OPC UA Part 2: Security Model - 세션 보안 정보
+        await this.testPermissions(); // OPC UA Part 2: Security Model - 권한 테스트
+        await this.testSecurityLogging(); // OPC UA Part 2: Security Model - 보안 감사
         
         this.log("✅ 보안 기능 테스트 완료");
     }
@@ -379,14 +350,9 @@ class SecureRobotOPCUAClient {
     async runPerformanceTests() {
         this.log("\n⚡ === 성능 테스트 시작 ===");
         
-        // 1. 읽기 성능 테스트
-        await this.testReadPerformance();
-        
-        // 2. 쓰기 성능 테스트
-        await this.testWritePerformance();
-        
-        // 3. 암호화 오버헤드 측정
-        await this.measureEncryptionOverhead();
+        await this.testReadPerformance(); // OPC UA Part 4: Services - 읽기 성능
+        await this.testWritePerformance(); // OPC UA Part 4: Services - 쓰기 성능
+        await this.measureEncryptionOverhead(); // OPC UA Part 2: Security Model - 암호화 오버헤드
         
         this.log("✅ 성능 테스트 완료");
     }
@@ -403,12 +369,12 @@ class SecureRobotOPCUAClient {
             const nodeId = this.nodeIds[`${jointName}.CurrentPosition`];
             if (nodeId) {
                 try {
-                    const result = await this.session.read({
+                    const result = await this.session.read({ // OPC UA Part 4: Services - Read 서비스
                         nodeId: nodeId,
-                        attributeId: AttributeIds.Value
+                        attributeId: AttributeIds.Value // OPC UA Part 3: Address Space Model - 속성 ID
                     });
                     
-                    if (result.statusCode.isGood()) {
+                    if (result.statusCode.isGood()) { // OPC UA Part 4: Services - 상태 코드 확인
                         this.log(`   ${jointName}: ${result.value.value.toFixed(2)}°`);
                     } else {
                         this.log(`   ${jointName}: 읽기 실패 - ${result.statusCode.toString()}`);
@@ -435,21 +401,20 @@ class SecureRobotOPCUAClient {
         this.log(`목표 위치: [${testPositions.join(', ')}]°`);
 
         try {
-            const result = await this.session.call({
+            const result = await this.session.call({ // OPC UA Part 4: Services - Call 서비스 (메서드 호출)
                 objectId: this.nodeIds.robot,
                 methodId: this.nodeIds.moveToPosition,
-                inputArguments: [{
-                    dataType: DataType.Double,
+                inputArguments: [{ // OPC UA Part 5: Information Model - 메서드 인수
+                    dataType: DataType.Double, // OPC UA Part 5: Information Model - 데이터 타입
                     arrayType: "Array", 
                     value: testPositions
                 }]
             });
 
-            if (result.statusCode.isGood() && result.outputArguments?.length > 0) {
+            if (result.statusCode.isGood() && result.outputArguments?.length > 0) { // OPC UA Part 4: Services - 메서드 응답 처리
                 const success = result.outputArguments[0].value;
                 this.log(`✅ 이동 ${success ? '성공' : '실패'}`);
                 
-                // 이동 완료까지 대기
                 if (success) {
                     await this.waitForMovementComplete();
                 }
@@ -475,7 +440,7 @@ class SecureRobotOPCUAClient {
         
         while (attempts < maxAttempts) {
             try {
-                const result = await this.session.read({
+                const result = await this.session.read({ // OPC UA Part 4: Services - 폴링 방식 상태 확인
                     nodeId: this.nodeIds.isMoving,
                     attributeId: AttributeIds.Value
                 });
@@ -508,10 +473,10 @@ class SecureRobotOPCUAClient {
         const homePositions = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
 
         try {
-            const result = await this.session.call({
+            const result = await this.session.call({ // OPC UA Part 4: Services - Call 서비스
                 objectId: this.nodeIds.robot,
                 methodId: this.nodeIds.moveToPosition,
-                inputArguments: [{
+                inputArguments: [{ // OPC UA Part 5: Information Model - 기본값 사용
                     dataType: DataType.Double,
                     arrayType: "Array",
                     value: homePositions
@@ -534,7 +499,7 @@ class SecureRobotOPCUAClient {
     /**
      * 세션 보안 정보 확인
      */
-    async checkSessionSecurity() {
+    async checkSessionSecurity() { // OPC UA Part 2: Security Model - 세션 보안 상태 확인
         this.log("\n🔍 세션 보안 정보:");
         
         if (this.session) {
@@ -549,10 +514,9 @@ class SecureRobotOPCUAClient {
     /**
      * 권한 테스트
      */
-    async testPermissions() {
+    async testPermissions() { // OPC UA Part 2: Security Model - 역할 기반 접근 제어 (RBAC)
         this.log("\n🔐 권한 테스트:");
         
-        // 현재 사용자의 권한에 따른 테스트
         const username = this.options.username;
         
         if (!username) {
@@ -565,14 +529,12 @@ class SecureRobotOPCUAClient {
             this.log(`   사용자: ${username} (${userConfig.role})`);
             this.log(`   권한: ${userConfig.permissions.join(', ')}`);
             
-            // 권한별 테스트 수행
-            if (userConfig.permissions.includes('read')) {
+            if (userConfig.permissions.includes('read')) { // OPC UA Part 2: Security Model - 읽기 권한 확인
                 this.log("   ✅ 읽기 권한 확인됨");
             }
             
-            if (userConfig.permissions.includes('write')) {
+            if (userConfig.permissions.includes('write')) { // OPC UA Part 2: Security Model - 쓰기 권한 확인
                 this.log("   ✅ 쓰기 권한 확인됨");
-                // 실제 쓰기 테스트는 여기서 수행
             } else {
                 this.log("   ❌ 쓰기 권한 없음");
             }
@@ -582,7 +544,7 @@ class SecureRobotOPCUAClient {
     /**
      * 보안 이벤트 로깅 테스트
      */
-    async testSecurityLogging() {
+    async testSecurityLogging() { // OPC UA Part 2: Security Model - 보안 감사 로깅
         this.log("\n📝 보안 이벤트 로깅 테스트:");
         this.log("   보안 관련 이벤트들이 서버에서 기록되고 있습니다.");
         this.log("   - 세션 생성/종료");
@@ -594,7 +556,7 @@ class SecureRobotOPCUAClient {
     /**
      * 읽기 성능 테스트
      */
-    async testReadPerformance() {
+    async testReadPerformance() { // OPC UA Part 4: Services - Read 서비스 성능 측정
         this.log("\n📊 읽기 성능 테스트:");
         
         const iterations = 100;
@@ -625,14 +587,13 @@ class SecureRobotOPCUAClient {
     /**
      * 쓰기 성능 테스트
      */
-    async testWritePerformance() {
+    async testWritePerformance() { // OPC UA Part 4: Services - Write 서비스 성능
         this.log("\n📊 쓰기 성능 테스트:");
         
-        // 쓰기 권한이 있는 경우만 테스트
         const username = this.options.username;
         const userConfig = securityConfig.authentication.defaultUsers[username];
         
-        if (!userConfig || !userConfig.permissions.includes('write')) {
+        if (!userConfig || !userConfig.permissions.includes('write')) { // OPC UA Part 2: Security Model - 권한 기반 테스트
             this.log("   쓰기 권한이 없어 스킵됩니다.");
             return;
         }
@@ -643,7 +604,7 @@ class SecureRobotOPCUAClient {
     /**
      * 암호화 오버헤드 측정
      */
-    async measureEncryptionOverhead() {
+    async measureEncryptionOverhead() { // OPC UA Part 2: Security Model - 암호화 성능 영향 측정
         this.log("\n🔒 암호화 오버헤드 측정:");
         
         const securityInfo = {
@@ -656,9 +617,9 @@ class SecureRobotOPCUAClient {
         if (securityInfo.policy === SecurityPolicy.None) {
             overhead = "0% (암호화 없음)";
         } else if (securityInfo.mode === MessageSecurityMode.Sign) {
-            overhead = "~5-10% (서명만)";
+            overhead = "~5-10% (서명만)"; // OPC UA Part 2: Security Model - 메시지 서명 오버헤드
         } else if (securityInfo.mode === MessageSecurityMode.SignAndEncrypt) {
-            overhead = "~10-15% (서명+암호화)";
+            overhead = "~10-15% (서명+암호화)"; // OPC UA Part 2: Security Model - 메시지 암호화 오버헤드
         }
         
         this.log(`   보안 정책: ${securityInfo.policy}`);
@@ -674,13 +635,13 @@ class SecureRobotOPCUAClient {
         
         try {
             if (this.session) {
-                await this.session.close();
+                await this.session.close(); // OPC UA Part 4: Services - CloseSession 서비스
                 this.session = null;
                 this.log("✅ 세션 종료 완료");
             }
             
             if (this.client) {
-                await this.client.disconnect();
+                await this.client.disconnect(); // OPC UA Part 6: Mappings - 네트워크 연결 해제
                 this.client = null;
                 this.log("✅ 클라이언트 연결 해제 완료");
             }
@@ -693,27 +654,21 @@ class SecureRobotOPCUAClient {
     /**
      * 전체 테스트 실행 (연결부터 종료까지)
      */
-    async runFullTest() {
+    async runFullTest() { // OPC UA Part 1: Concepts - 완전한 테스트 생명주기
         try {
-            // 1. 연결
-            await this.connect();
-            
-            // 2. 세션 생성
-            await this.createSession();
-            
-            // 3. 테스트 실행
-            await this.runTests();
+            await this.connect(); // OPC UA Part 6: Mappings - 연결 수립
+            await this.createSession(); // OPC UA Part 4: Services - 세션 생성
+            await this.runTests(); // OPC UA Part 4: Services - 서비스 테스트
             
         } finally {
-            // 4. 정리
-            await this.disconnect();
+            await this.disconnect(); // OPC UA Part 1: Concepts - 리소스 정리
         }
     }
 
     /**
      * 유틸리티: 지연 함수
      */
-    sleep(ms) {
+    sleep(ms) { // OPC UA Part 1: Concepts - 동기화 및 타이밍
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 }

@@ -1,3 +1,6 @@
+// OPC UA Part 4: Services - 클라이언트 서비스 구현
+// OPC UA Part 6: Mappings - TCP/IP 클라이언트 매핑
+// OPC UA Part 12: Discovery - 엔드포인트 디스커버리
 const { OPCUAClient, MessageSecurityMode, SecurityPolicy, AttributeIds } = require("node-opcua");
 const config = require('../config/config');
 
@@ -6,13 +9,13 @@ const config = require('../config/config');
  */
 class RobotOPCUAClient {
     constructor() {
-        this.client = OPCUAClient.create({
-            securityMode: MessageSecurityMode.None,
-            securityPolicy: SecurityPolicy.None,
-            endpointMustExist: false
+        this.client = OPCUAClient.create({ // OPC UA Part 4: Services - 클라이언트 생성 서비스
+            securityMode: MessageSecurityMode.None, // OPC UA Part 2: Security Model - 보안 모드 설정
+            securityPolicy: SecurityPolicy.None, // OPC UA Part 2: Security Model - 보안 정책 설정
+            endpointMustExist: false // OPC UA Part 12: Discovery - 엔드포인트 존재 검증
         });
         
-        this.nodeIds = {};
+        this.nodeIds = {}; // OPC UA Part 3: Address Space Model - 노드 ID 캐시
     }
 
     /**
@@ -21,11 +24,11 @@ class RobotOPCUAClient {
     async connect() {
         console.log("🔗 로봇 서버에 연결 중...");
         
-        await this.client.withSessionAsync(config.server.endpointUrl, async (session) => {
+        await this.client.withSessionAsync(config.server.endpointUrl, async (session) => { // OPC UA Part 4: Services - 세션 관리 서비스
             console.log("✅ 연결 및 세션 생성 완료");
             
-            await this.discoverNodes(session);
-            await this.runTests(session);
+            await this.discoverNodes(session); // OPC UA Part 3: Address Space Model - 노드 탐색
+            await this.runTests(session); // OPC UA Part 4: Services - 클라이언트 서비스 실행
         });
         
         console.log("🔌 연결 종료");
@@ -38,8 +41,7 @@ class RobotOPCUAClient {
     async discoverNodes(session) {
         console.log("\n🔍 노드 탐색 중...");
         
-        // Objects 폴더에서 Robot 객체 찾기
-        const browseResult = await session.browse("i=85");
+        const browseResult = await session.browse("i=85"); // OPC UA Part 4: Services - Browse 서비스
         let robotNodeId = null;
         
         for (const ref of browseResult.references) {
@@ -56,15 +58,13 @@ class RobotOPCUAClient {
         this.nodeIds.robot = robotNodeId.toString();
         console.log("🤖 Robot 객체 발견:", this.nodeIds.robot);
 
-        // Robot 객체의 하위 노드들 탐색
-        const robotBrowseResult = await session.browse(robotNodeId);
+        const robotBrowseResult = await session.browse(robotNodeId); // OPC UA Part 4: Services - Browse 서비스
         
         for (const ref of robotBrowseResult.references) {
             const nodeName = ref.browseName.name;
             
             if (config.robot.jointNames.includes(nodeName)) {
-                // 관절 객체의 CurrentPosition 변수 찾기
-                const jointBrowseResult = await session.browse(ref.nodeId);
+                const jointBrowseResult = await session.browse(ref.nodeId); // OPC UA Part 3: Address Space Model - 계층적 탐색
                 for (const jointRef of jointBrowseResult.references) {
                     if (jointRef.browseName.name === "CurrentPosition") {
                         this.nodeIds[`${nodeName}.CurrentPosition`] = jointRef.nodeId.toString();
@@ -87,19 +87,10 @@ class RobotOPCUAClient {
      * @param {Object} session - OPC UA 세션
      */
     async runTests(session) {
-        // 1. 초기 상태 읽기
+        await this.readPositions(session); // OPC UA Part 4: Services - Read 서비스
+        await this.testMovement(session); // OPC UA Part 4: Services - Call 서비스
         await this.readPositions(session);
-        
-        // 2. 로봇 이동 테스트
-        await this.testMovement(session);
-        
-        // 3. 결과 확인
-        await this.readPositions(session);
-        
-        // 4. 홈 포지션으로 복귀
         await this.moveToHome(session);
-        
-        // 5. 최종 상태 확인
         await this.readPositions(session);
     }
 
@@ -113,12 +104,12 @@ class RobotOPCUAClient {
         for (const jointName of config.robot.jointNames) {
             const nodeId = this.nodeIds[`${jointName}.CurrentPosition`];
             if (nodeId) {
-                const result = await session.read({
+                const result = await session.read({ // OPC UA Part 4: Services - Read 서비스
                     nodeId: nodeId,
-                    attributeId: AttributeIds.Value
+                    attributeId: AttributeIds.Value // OPC UA Part 3: Address Space Model - 속성 접근
                 });
                 
-                if (result.statusCode.isGood()) {
+                if (result.statusCode.isGood()) { // OPC UA Part 4: Services - 상태 코드 처리
                     console.log(`   ${jointName}: ${result.value.value}°`);
                 } else {
                     console.log(`   ${jointName}: 읽기 실패 - ${result.statusCode.toString()}`);
@@ -143,17 +134,17 @@ class RobotOPCUAClient {
         console.log(`목표 위치: [${testPositions.join(', ')}]°`);
 
         try {
-            const result = await session.call({
+            const result = await session.call({ // OPC UA Part 4: Services - Call 서비스 (메서드 호출)
                 objectId: this.nodeIds.robot,
                 methodId: this.nodeIds.moveToPosition,
-                inputArguments: [{
+                inputArguments: [{ // OPC UA Part 5: Information Model - 메서드 인수 정의
                     dataType: "Double",
                     arrayType: "Array",
                     value: testPositions
                 }]
             });
 
-            if (result.statusCode.isGood() && result.outputArguments?.length > 0) {
+            if (result.statusCode.isGood() && result.outputArguments?.length > 0) { // OPC UA Part 4: Services - 응답 처리
                 const success = result.outputArguments[0].value;
                 console.log(`✅ 이동 ${success ? '성공' : '실패'}`);
             } else {
@@ -175,10 +166,10 @@ class RobotOPCUAClient {
         if (!this.nodeIds.moveToPosition) return;
 
         try {
-            const result = await session.call({
+            const result = await session.call({ // OPC UA Part 4: Services - Call 서비스
                 objectId: this.nodeIds.robot,
                 methodId: this.nodeIds.moveToPosition,
-                inputArguments: [{
+                inputArguments: [{ // OPC UA Part 5: Information Model - 기본값 사용
                     dataType: "Double",
                     arrayType: "Array",
                     value: config.robot.defaultPositions
@@ -202,10 +193,10 @@ async function main() {
     const client = new RobotOPCUAClient();
     
     try {
-        await client.connect();
+        await client.connect(); // OPC UA Part 6: Mappings - TCP 연결 수립
     } catch (error) {
         console.error("❌ 클라이언트 오류:", error.message);
     }
 }
 
-main();
+main(); // OPC UA Part 1: Concepts - 애플리케이션 실행

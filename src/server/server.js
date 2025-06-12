@@ -1,3 +1,9 @@
+// Part 1: Concepts - 애플리케이션 생명주기 및 오류 처리
+// Part 3: Address Space Model - 주소 공간 구성
+// Part 4: Services - 서버 서비스 구현 및 초기화
+// Part 5: Information Model - 표준 노드셋 및 디바이스 정보 모델
+// Part 6: Mappings - TCP/IP 네트워크 바인딩
+// Part 12: Discovery - 엔드포인트 URL 제공
 const { OPCUAServer, nodesets } = require('node-opcua');
 const { constructAddressSpace } = require('./address-space');
 const config = require('../config/config');
@@ -25,14 +31,11 @@ class RobotOPCUAServer {
         try {
             console.log("🚀 HCR 로봇 OPC UA 서버 시작 중...");
             
-            // 서버 초기화
             await this.server.initialize();
             console.log("⚙️  서버 초기화 완료");
             
-            // 주소 공간 구성
             constructAddressSpace(this.server);
             
-            // 서버 시작
             await this.server.start();
             
             console.log("✅ 서버 시작 완료");
