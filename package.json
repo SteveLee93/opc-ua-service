@@ -20,9 +20,9 @@
   "author": "HCR",
   "license": "ISC",
   "dependencies": {
+    "node-fetch": "^2.7.0",
     "node-opcua": "^2.119.0"
   },
-  "devDependencies": {},
   "engines": {
     "node": ">=14.0.0"
   }
